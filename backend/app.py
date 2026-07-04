@@ -1,5 +1,5 @@
 import os
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
@@ -8,7 +8,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = Flask(__name__)
+# Serve frontend build if available
+static_folder = os.path.join(os.path.dirname(__file__), '../frontend/dist')
+if os.path.exists(static_folder):
+    app = Flask(__name__, static_folder=static_folder, static_url_path='')
+else:
+    app = Flask(__name__)
+
 CORS(app)
 
 # ==================== CONFIGURATION ====================
@@ -436,12 +442,29 @@ def remove_favorite(music_id):
     return jsonify({'message': 'Music removed from favorites'}), 200
 
 
-# ==================== ERROR HANDLERS ====================
+# ==================== FRONTEND ROUTES ====================
 
-@app.errorhandler(404)
-def not_found(error):
+@app.route('/')
+def serve_frontend():
+    """Serve the frontend index.html"""
+    if os.path.exists(static_folder):
+        return send_from_directory(static_folder, 'index.html')
+    return jsonify({'message': 'GOMORA API - Frontend not built yet'}), 200
+
+
+@app.route('/<path:path>')
+def serve_static(path):
+    """Serve static files or fallback to index.html for SPA routing"""
+    if os.path.exists(static_folder):
+        file_path = os.path.join(static_folder, path)
+        if os.path.exists(file_path):
+            return send_from_directory(static_folder, path)
+        # Fallback to index.html for SPA routing
+        return send_from_directory(static_folder, 'index.html')
     return jsonify({'error': 'Resource not found'}), 404
 
+
+# ==================== ERROR HANDLERS ====================
 
 @app.errorhandler(500)
 def internal_error(error):
